@@ -1,2 +1,2 @@
-# Spider4School
- 爬取学校最新通知
+# Spider School
+ 获取学校最新通知并发送邮件
