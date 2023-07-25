@@ -89,6 +89,11 @@ def update():
     """
     print('通知系统启动中')
     old_pattern = request_yanjiusheng()  # 记录原始内容列表
+    title_df = pd.DataFrame({'标题': old_pattern[0]})
+    time_df = pd.DataFrame({'时间': old_pattern[1]})
+    href_df = pd.DataFrame({'链接': old_pattern[2]})
+
+
     while True:
         new_pattern = request_yanjiusheng()  # 记录新内容列表
         if new_pattern != old_pattern:  # 判断内容列表是否更新
