@@ -16,24 +16,24 @@ import csv
 
 def request_yanjiusheng():
     """
-    访问***
+    访问xxxx
     :return: 以列表形式 title_text（标题） time_text（时间） href_text（链接）
     """
     # 设置请求头参数：User-Agent, cookie, referer
     headers = {
-        'User-Agent': '***',
-        'cookie': "***",
+        'User-Agent': '**',
+        'cookie': "**",
         # 设置从何处跳转过来
-        'referer': '***'
+        'referer': '**'
     }
 
-    for i in range(1, 5):  # 暂取5页
+    for i in range(1, 2):  # 暂取1页
         if i != 1:
-            url = '***' + str(i) + '.jhtml'
+            url = 'xxx' + str(i) + '.jhtml'
         else:
-            url = '***'
+            url = 'xxx'
 
-        # url = '***' # 首页网址URL
+        # url = 'xxx' # 首页网址URL
         page_text = requests.get(url=url, headers=headers).text  # 请求发送
         tree = etree.HTML(page_text)  # 数据解析
 
@@ -48,24 +48,25 @@ def request_yanjiusheng():
         return [title_text, time_text, href_text]
 
 
-def send_email():
+def send_email(href, title):
     """
     发送邮件
     =========发送内容尚未编辑完成
     """
     host_server = 'smtp.qq.com'  # qq邮箱smtp服务器
-    sender_qq = '***'  # 发件人邮箱
-    pwd = '***'
-    receiver = '***'
-    mail_title = 'Python自动发送html格式的邮件'  # 邮件标题
+    sender_qq = 'xxxx@foxmail.com'  # 发件人邮箱
+    pwd = '**'
+    receivers = ['xxxx@qq.com']
+    mail_title = "【研究生院通知更新】{} {}".format(datetime.datetime.now().strftime('%Y-%m-%d'), time.strftime("%H:%M:%S"))  # 邮件标题
 
     # 邮件正文内容
-    mail_content = "您好，<p>这是使用python登录QQ邮箱发送HTNL格式邮件的测试：</p> <p><a href='https://blog.csdn.net/weixin_44827418?spm=1000.2115.3001.5113'>CSDN个人主页</a></p>"
+    mail_content = "研究生院有新通知，<p>这是研究生院的新通知：</p> <p><a href={}>{}</a></p>".format(href, title)
+    print(mail_content)
 
     msg = MIMEMultipart()
     msg["Subject"] = Header(mail_title, 'utf-8')
     msg["From"] = sender_qq
-    msg["To"] = Header("测试邮箱", "utf-8")
+    msg["To"] = receivers[0]
 
     msg.attach(MIMEText(mail_content, 'html'))
 
@@ -74,32 +75,66 @@ def send_email():
         smtp.set_debuglevel(1)  # 0是关闭，1是开启debug
         smtp.ehlo(host_server)  # 跟服务器打招呼，告诉它我们准备连接，最好加上这行代码
         smtp.login(sender_qq, pwd)
-        smtp.sendmail(sender_qq, receiver, msg.as_string())
+        smtp.sendmail(sender_qq, receivers[0], msg.as_string())
         smtp.quit()
         print("邮件发送成功")
     except smtplib.SMTPException:
         print("无法发送邮件")
 
 
-def update():
+def update(filename):
     """
     更新网页
-    每5分钟更新一次
-    ========更新内容尚未完成
     """
-    print('通知系统启动中')
-    old_pattern = request_yanjiusheng()  # 记录原始内容列表
-    title_df = pd.DataFrame({'标题': old_pattern[0]})
-    time_df = pd.DataFrame({'时间': old_pattern[1]})
-    href_df = pd.DataFrame({'链接': old_pattern[2]})
+    try:
+        df = pd.read_excel('./研究生教务通知.xls')
+    except FileNotFoundError:
+        print('找不到储存文件，已终止程序')
+        exit()
+
+    # 获取请求
+    result = request_yanjiusheng()
+    title_request = result[0]
+    date_request = result[1]
+    href_request = result[2]
+
+    href_data = df['href'].tolist()  # 文件中的href列表
+    data_return = pd.DataFrame(columns=['title', 'time', 'href']) # 存放所有更新信息汇总
+
+    for i in range(len(href_request)):
+        href = href_request[i]  # 当前网站上href、标题、时间
+        title = title_request[i]
+        date = date_request[i]
+        # 检查每一个href是否已经存在xls中
+        if href not in href_data:  # 不存在->有更新
+            # 新增标题、时间、href进入xls中
+            result = list(map(list, zip(*[[title], [date], [href]])))
+            new_data = pd.DataFrame(result, columns=['title', 'time', 'href'])
+            data_return = pd.concat([data_return, new_data])
+    df = pd.concat([df, data_return])
+    df.to_excel('**.xls', index=False)
+    return data_return
+
+def new_xls():
+    """
+    初始化文件列表
+    :return:
+    """
+    df = pd.DataFrame(columns=['title', 'time', 'href']) # 新建表格
+    result = request_yanjiusheng() # 获取请求
+    result = list(map(list, zip(*result)))
+    new_data = pd.DataFrame(result, columns=['title','time','href']) # 写入数据
+    df = pd.concat([df, new_data])
+    df.to_excel('**.xls', index=False)
+    print("已获取通知并初始化文件")
 
 
+if __name__=='__main__':
     while True:
-        new_pattern = request_yanjiusheng()  # 记录新内容列表
-        if new_pattern != old_pattern:  # 判断内容列表是否更新
-            old_pattern = new_pattern  # 原始内容列表改变
-            send_email()  # 发送邮件
-        else:
-            now = datetime.datetime.now()
-            print(now, "尚无更新")
-        time.sleep(300)  # 五分钟检测一次
+        new_dataframe = update('./研究生教务通知.xls')
+        if not new_dataframe.empty:
+            href_list = new_dataframe['href'].tolist()
+            title_list = new_dataframe['title'].tolist()
+            for i in range(len(title_list)):
+                send_email(href=href_list[i], title=title_list[i])
+        time.sleep(60)
